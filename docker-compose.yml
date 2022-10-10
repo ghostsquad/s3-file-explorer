@@ -1,0 +1,12 @@
+services:
+  app:
+    image: ${APP_IMAGE}
+    pull_policy: never
+
+  test:
+    image: alpine/httpie
+    entrypoint: sh /var/run/test.sh
+    depends_on:
+    - app
+    volumes:
+    - ./hack/test.sh:/var/run/test.sh

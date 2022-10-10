@@ -1,0 +1,111 @@
+version: '3'
+env:
+  GOPRIVATE: github.com/tunein
+  GO111MODULE: on
+  GOPROXY: https://proxy.golang.org,direct
+vars:
+  GIT_COMMIT:
+    sh: git rev-parse HEAD
+  GIT_COMMIT_SHORT:
+    sh: git rev-parse --short=8 HEAD
+  # https://stackoverflow.com/questions/58033366/how-to-get-the-current-branch-within-github-actions
+  GIT_BRANCH:
+    sh: if [ "${CI:-}" == "true" ]; then echo "${GITHUB_REF_NAME}"; else git branch --show-current; fi
+
+  EXPECTED_GO_VERSION: 1.19.2
+  EXPECTED_GO_VERSION_SHORT: '{{slice (.EXPECTED_GO_VERSION | splitList ".") 0 2 | join "."}}'
+  CURRENT_GO_VERSION:
+    sh: asdf current golang | awk '{ print $2 }'
+
+  DEBIAN_VERSION_CODENAME: bullseye
+  DEBIAN_VERSION: 11.5
+  GOLANG_BUILDER_IMAGE: '{{.CURRENT_GO_VERSION}}-{{.DEBIAN_VERSION_CODENAME}}'
+  DEBIAN_IMAGE: '{{.DEBIAN_VERSION_CODENAME}}-{{.DEBIAN_VERSION}}-slim'
+
+  APP_IMAGE: 'docker.io/ghostsquad/s3-file-explorer:{{.GIT_COMMIT}}'
+
+tasks:
+  test:unit: gotestsum --format short-verbose
+  test:race: gotestsum --format short-verbose -- -race
+  test:bench: gotestsum --format short-verbose -- -bench=. -run=^$$
+
+  test:all:
+    cmds:
+    - task: test:unit
+    - task: test:race
+    - task: test:bench
+
+  test:unit:ci: gotestsum --junitfile reports/unit-tests.xml -- -bench=. -run=^$$
+  test:race:ci: gotestsum --junitfile reports/race-tests.xml -- -race
+  test:bench:ci: go test -run=^$$ -bench=. ./... | tee reports/bench.txt
+
+  test:all:ci:
+    cmds:
+    - task: test:unit:ci
+    - task: test:race:ci
+    - task: test:bench:ci
+
+  test:
+    deps:
+    - task: build
+      vars:
+        BUILD_ARGS: --output=type=docker
+    - task: test:all
+    run: once
+    cmds:
+    - |-
+      APP_IMAGE='{{.APP_IMAGE}}' \
+      docker-compose up \
+        --exit-code-from test \
+        --abort-on-container-exit
+
+  build:
+    vars:
+      IMAGE_TAG_PREFIX: ""
+      BUILD_ARGS: '{{.BUILD_ARGS}}'
+      APP_VERSION: '{{.GIT_COMMIT}}'
+    label: 'build with {{.BUILD_ARGS}}'
+    cmds:
+    - |-
+      docker buildx build \
+        --tag {{.APP_IMAGE}} \
+        --build-arg GOLANG_BUILDER_IMAGE={{.GOLANG_BUILDER_IMAGE}} \
+        --build-arg DEBIAN_IMAGE={{.DEBIAN_IMAGE}} \
+        {{.BUILD_ARGS}} \
+        .
+
+  publish:
+    cmds:
+    - task: test
+    - task: build
+      vars:
+        BUILD_ARGS: |-
+          --platform linux/amd64,linux/arm64 \
+          --push
+
+  go:version:verify:
+    cmds:
+    - task: go:version:set
+    - task: git:status:dirty
+  go:version:get:
+    cmds:
+    - echo {{.CURRENT_GO_VERSION}}
+
+  go:version:set:
+    vars:
+      GO_VERSION: '{{.CLI_ARGS | default .EXPECTED_GO_VERSION}}'
+      GO_VERSION_SHORT: '{{slice (.GO_VERSION | splitList ".") 0 2 | join "."}}'
+    cmds:
+    - go mod edit --go={{.GO_VERSION_SHORT}}
+    - asdf install golang {{.GO_VERSION}}
+    - asdf local golang {{.GO_VERSION}}
+    - go mod tidy
+
+  go:version:update:
+    cmds:
+    - task: go:version:set
+      vars:
+        GO_VERSION:
+          sh: asdf latest golang
+
+  git:status:dirty: '[ -z "$(git status --porcelain=v1 2>/dev/null)" ]'
