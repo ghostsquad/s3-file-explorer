@@ -23,7 +23,14 @@ TBD
 
 ## Contributing
 
-TBD
+```
+brew install asdf
+asdf plugin-add task https://github.com/particledecay/asdf-task.git
+asdf plugin add python
+
+asdf install
+```
+
 
 ## Roadmap
 

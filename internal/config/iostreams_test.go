@@ -1,4 +1,4 @@
-package iostreams
+package config
 
 import (
 	"bytes"

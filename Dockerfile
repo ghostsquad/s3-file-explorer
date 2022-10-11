@@ -10,10 +10,12 @@ COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
 COPY . .
-RUN go build -v -o /usr/local/bin/app ./...
+RUN go build -v -o /usr/local/bin/app .
 
 FROM $DEBIAN_IMAGE
 
 WORKDIR /usr/src/app
 
-COPY --from=builder /usr/src/app/app /usr/src/app/app
+COPY --from=builder /usr/local/bin/app /app
+
+CMD ["/app"]

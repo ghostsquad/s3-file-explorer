@@ -5,7 +5,7 @@ success="false"
 n=0
 until [ "$n" -ge 5 ]
 do
-  if http --check-status --ignore-stdin --timeout=2.5 GET http://app:8080 &> /dev/null; then
+  if http --check-status --ignore-stdin --timeout=1 GET http://app:8080/ping &> /dev/null; then
     success="true"
     echo 'OK!' && break
   else

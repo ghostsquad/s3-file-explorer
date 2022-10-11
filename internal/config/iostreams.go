@@ -1,4 +1,4 @@
-package iostreams
+package config
 
 import (
 	"io"
@@ -7,20 +7,20 @@ import (
 
 type std struct{}
 
-func (s *std) In() io.Reader {
+func (s std) In() io.Reader {
 	return os.Stdin
 }
 
-func (s *std) Out() io.Writer {
+func (s std) Out() io.Writer {
 	return os.Stdout
 }
 
-func (s *std) ErrOut() io.Writer {
+func (s std) ErrOut() io.Writer {
 	return os.Stderr
 }
 
-func NewStdIOStreams() *std {
-	return &std{}
+func NewStdIOStreams() std {
+	return std{}
 }
 
 type IOStreams interface {
