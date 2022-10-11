@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -12,6 +13,9 @@ import (
 	"github.com/caarlos0/env/v6"
 	"github.com/gin-gonic/gin"
 	"github.com/oklog/run"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/ghostsquad/s3-file-explorer/internal/aws"
 	"github.com/ghostsquad/s3-file-explorer/internal/config"
@@ -24,7 +28,7 @@ var (
 	builtBy = "unknown"
 )
 
-const binaryName = "fn"
+const binaryName = "s3-file-explorer"
 
 func main() {
 	streams := config.NewStdIOStreams()
@@ -79,11 +83,26 @@ func setupRouter(cfg config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(logger, gin.Recovery())
 
+	reg := prometheus.NewRegistry()
+	reg.MustRegister(collectors.NewBuildInfoCollector())
+	reg.MustRegister(collectors.NewGoCollector(
+		collectors.WithGoCollectorRuntimeMetrics(collectors.GoRuntimeMetricsRule{Matcher: regexp.MustCompile("/.*")}),
+	))
+
 	// TODO metrics endpoints and other liveness endpoints should likely be part of a different listener
 	// so that they can be monitored internally but not exposed to the internet
+	// https://github.com/gin-gonic/gin#run-multiple-service-using-gin
 	r.GET("/ping", func(c *gin.Context) {
 		c.String(http.StatusOK, "pong")
 	})
+
+	r.GET("/metrics", gin.WrapH(promhttp.HandlerFor(
+		reg,
+		promhttp.HandlerOpts{
+			// Opt into OpenMetrics to support exemplars.
+			EnableOpenMetrics: true,
+		},
+	)))
 
 	// Gin currently doesn't support both wild-card routes that overlap/conflict with static routes
 	// https://github.com/gin-gonic/gin/issues/2920
@@ -94,7 +113,12 @@ func setupRouter(cfg config.Config) *gin.Engine {
 	// Although the original requirement doc specifies that any path should be supported from the root
 	// We'll implement a prefix method in order to support other required paths
 	// Additionally, it would make sense to try to contribute back to Gin, as these issues have been open for a while
-	r.GET("/p/*path", func(c *gin.Context) {
+
+	// Additionally, create a path group so that can capture metrics for only this group
+	paths := r.Group("/p")
+	paths.Use(responseDuration(reg))
+
+	paths.GET("/*path", func(c *gin.Context) {
 		// TODO understand if the AWS Client needs to be created per request or once at startup
 		client, err := aws.NewClient(c)
 		if err != nil {
