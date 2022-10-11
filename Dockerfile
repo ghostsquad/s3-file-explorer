@@ -14,6 +14,11 @@ RUN go build -v -o /usr/local/bin/app .
 
 FROM $DEBIAN_IMAGE
 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates
+
+RUN update-ca-certificates
+
 WORKDIR /usr/src/app
 
 COPY --from=builder /usr/local/bin/app /app
