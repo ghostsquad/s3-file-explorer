@@ -1,6 +1,6 @@
 version: '3'
 env:
-  GOPRIVATE: github.com/tunein
+  GOPRIVATE: github.com/ghostsquad
   GO111MODULE: on
   GOPROXY: https://proxy.golang.org,direct
 vars:
