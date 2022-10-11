@@ -23,7 +23,7 @@ vars:
   GOLANG_BUILDER_IMAGE: 'golang:{{.CURRENT_GO_VERSION}}-{{.DEBIAN_VERSION_CODENAME}}'
   DEBIAN_IMAGE: 'debian:{{.DEBIAN_VERSION}}-slim'
 
-  APP_IMAGE: 'docker.io/ghostsquad/s3-file-explorer:{{.GIT_COMMIT}}'
+  APP_IMAGE: docker.io/ghostsquad/s3-file-explorer:{{.GIT_COMMIT}}
 
 tasks:
   download:
@@ -130,11 +130,10 @@ tasks:
   publish:
     run: once
     cmds:
-    - task: test
     - task: build
       vars:
         BUILD_ARGS: |-
-          --platform linux/amd64,linux/arm64 \
+          --platform linux/amd64 \
           --push
 
   go:version:verify:
