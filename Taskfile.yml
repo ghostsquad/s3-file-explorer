@@ -120,8 +120,8 @@ tasks:
     - http localhost:8080/p/at-the-root.txt
     - http localhost:8080/p/test/
     - http localhost:8080/p/test/inside-test.txt
-    - http localhost:8080/p/layer2/
-    - http localhost:8080/p/layer2/layer2-1.txt
+    - http localhost:8080/p/test/layer2/
+    - http localhost:8080/p/test/layer2/layer2-1.txt
     - http localhost:8080/p/does-not-exist/
     - http localhost:8080/p/does-not-exist.txt
 
